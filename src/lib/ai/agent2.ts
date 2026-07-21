@@ -85,7 +85,10 @@ export async function callAgent2(
     const content = data.choices?.[0]?.message?.content;
     if (!content) return fallbackAgent2(question, company);
 
-    const parsed = JSON.parse(content) as Agent2Response;
+    const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return fallbackAgent2(question, company);
+    const parsed = JSON.parse(jsonMatch[0]) as Agent2Response;
 
     // Ensure option E always exists
     if (!parsed.options || parsed.options.length < 5) {
