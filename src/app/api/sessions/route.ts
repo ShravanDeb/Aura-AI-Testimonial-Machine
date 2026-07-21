@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createSession, getSessionBySlug } from "@/lib/ai/pipeline";
+import { getSessionBySlug } from "@/lib/ai/pipeline";
 import {
   db,
   collection,
@@ -42,6 +42,7 @@ export async function POST(request: Request) {
       userId: companyData.user_id || "",
     };
 
+    const { createSession } = await import("@/lib/ai/pipeline");
     const { sessionId, slug } = await createSession(
       companyId,
       company,
@@ -59,7 +60,7 @@ export async function POST(request: Request) {
   }
 }
 
-// GET — Get session by slug
+// GET — Get session by slug, OR lookup company by share_token
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
@@ -69,13 +70,38 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "slug is required" }, { status: 400 });
     }
 
+    // First: try to find an existing interview session
     const session = await getSessionBySlug(slug);
-    if (!session) {
-      return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    if (session) {
+      return NextResponse.json({ type: "session", ...session });
     }
 
-    return NextResponse.json(session);
-  } catch {
+    // Second: try to find a company by share_token
+    const companySnap = await getDocs(
+      query(
+        collection(db, "campaigns"),
+        where("share_token", "==", slug),
+        limit(1)
+      )
+    );
+
+    if (!companySnap.empty) {
+      const doc = companySnap.docs[0];
+      const data = doc.data();
+      return NextResponse.json({
+        type: "company",
+        companyId: doc.id,
+        company_name: data.name || "Unknown",
+        company_description: data.description || "",
+        company_target_audience: data.target_audience || "customers",
+        share_token: data.share_token,
+        status: "active",
+      });
+    }
+
+    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+  } catch (err) {
+    console.error("Session lookup error:", err);
     return NextResponse.json(
       { error: "Failed to fetch session" },
       { status: 500 }

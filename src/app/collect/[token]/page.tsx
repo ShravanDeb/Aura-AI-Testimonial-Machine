@@ -9,7 +9,7 @@ interface Option {
 }
 
 interface InterviewState {
-  status: "loading" | "intro" | "interview" | "processing" | "done" | "error";
+  status: "loading" | "intro" | "collecting_info" | "interview" | "processing" | "done" | "error";
   question: string;
   options: Option[];
   completeness: number;
@@ -20,6 +20,10 @@ interface InterviewState {
   error: string;
   companyName: string;
   polished: string;
+  companyId: string;
+  sessionSlug: string;
+  customerName: string;
+  customerEmail: string;
 }
 
 export default function CollectPage() {
@@ -38,6 +42,10 @@ export default function CollectPage() {
     error: "",
     companyName: "",
     polished: "",
+    companyId: "",
+    sessionSlug: "",
+    customerName: "",
+    customerEmail: "",
   });
 
   const [messages, setMessages] = useState<
@@ -46,12 +54,11 @@ export default function CollectPage() {
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom when new message arrives
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Fetch session data on mount
+  // Fetch company/session data on mount
   useEffect(() => {
     if (!slug) {
       setState((s) => ({ ...s, status: "error", error: "Invalid link" }));
@@ -65,40 +72,74 @@ export default function CollectPage() {
           setState((s) => ({ ...s, status: "error", error: "Session not found" }));
           return;
         }
-        const session = await res.json();
-        setState((s) => ({
-          ...s,
-          status: "intro",
-          companyName: session.company_name || "this company",
-        }));
+        const data = await res.json();
+
+        if (data.type === "session" && data.status === "active") {
+          // Already has an active session — resume it
+          setState((s) => ({
+            ...s,
+            status: "interview",
+            companyName: data.company_name || "this company",
+            sessionSlug: data.slug,
+          }));
+        } else if (data.type === "company") {
+          // Company found, no session yet — show intro
+          setState((s) => ({
+            ...s,
+            status: "intro",
+            companyName: data.company_name || "this company",
+            companyId: data.companyId,
+          }));
+        } else {
+          setState((s) => ({ ...s, status: "error", error: "Link is no longer active" }));
+        }
       } catch {
-        setState((s) => ({ ...s, status: "error", error: "Failed to load session" }));
+        setState((s) => ({ ...s, status: "error", error: "Failed to load" }));
       }
     }
 
     loadSession();
   }, [slug]);
 
-  const startInterview = useCallback(async () => {
+  const handleGetStarted = useCallback(() => {
+    setState((s) => ({ ...s, status: "collecting_info" }));
+  }, []);
+
+  const createSessionAndStart = useCallback(async () => {
+    const name = state.customerName.trim();
+    if (!name) return;
+
     setState((s) => ({ ...s, status: "interview" }));
 
     try {
-      const res = await fetch(`/api/sessions/${slug}/message`, {
+      // Create a new session
+      const createRes = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId: state.companyId,
+          customerName: name,
+          customerEmail: state.customerEmail.trim(),
+        }),
+      });
+
+      if (!createRes.ok) throw new Error("Failed to create session");
+      const { slug: newSlug } = await createRes.json();
+
+      setState((s) => ({ ...s, sessionSlug: newSlug }));
+
+      // Start the interview
+      const startRes = await fetch(`/api/sessions/${newSlug}/message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "start" }),
       });
 
-      if (!res.ok) throw new Error("Failed to start interview");
-
-      const data = await res.json();
+      if (!startRes.ok) throw new Error("Failed to start interview");
+      const data = await startRes.json();
 
       if (data.status === "interview_complete") {
-        setState((s) => ({
-          ...s,
-          status: "processing",
-          completeness: 100,
-        }));
+        setState((s) => ({ ...s, status: "processing", completeness: 100 }));
         return;
       }
 
@@ -123,7 +164,7 @@ export default function CollectPage() {
         error: "Failed to start interview. Please try again.",
       }));
     }
-  }, [slug]);
+  }, [state.companyId, state.customerName, state.customerEmail]);
 
   const selectOption = useCallback(
     (optionId: string) => {
@@ -155,10 +196,8 @@ export default function CollectPage() {
       return;
     }
 
-    // Add user message to chat
     setMessages((prev) => [...prev, { role: "user", answer }]);
 
-    // Clear selection
     setState((s) => ({
       ...s,
       selectedOption: null,
@@ -169,7 +208,7 @@ export default function CollectPage() {
     }));
 
     try {
-      const res = await fetch(`/api/sessions/${slug}/message`, {
+      const res = await fetch(`/api/sessions/${state.sessionSlug}/message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "answer", answer, selectedOptionId }),
@@ -180,12 +219,7 @@ export default function CollectPage() {
       const data = await res.json();
 
       if (data.status === "interview_complete") {
-        setState((s) => ({
-          ...s,
-          status: "processing",
-          completeness: 100,
-        }));
-        // Wait for testimonial generation then show done
+        setState((s) => ({ ...s, status: "processing", completeness: 100 }));
         setTimeout(() => {
           setState((s) => ({ ...s, status: "done" }));
         }, 3000);
@@ -211,7 +245,7 @@ export default function CollectPage() {
         error: "Something went wrong. Please try again.",
       }));
     }
-  }, [slug, state.selectedOption, state.options, state.showCustomInput, state.customAnswer]);
+  }, [state.sessionSlug, state.selectedOption, state.options, state.showCustomInput, state.customAnswer]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -251,9 +285,69 @@ export default function CollectPage() {
             A few quick questions. Takes about 2 minutes. Your words will be
             polished by AI and shared with your permission.
           </p>
-          <button onClick={startInterview} style={primaryButtonStyle}>
+          <button onClick={handleGetStarted} style={primaryButtonStyle}>
             Get started
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (state.status === "collecting_info") {
+    return (
+      <div style={containerStyle}>
+        <div style={{ maxWidth: "40rem", width: "100%" }}>
+          <p style={labelStyle}>Before we begin</p>
+          <h1 style={{ ...headingStyle, fontSize: "var(--text-h3)" }}>
+            A couple quick details
+          </h1>
+          <p style={{ ...bodyStyle, marginBottom: "var(--space-2xl)", maxWidth: "30rem" }}>
+            We need your name so we can attribute the testimonial to you.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-md)" }}>
+            <div>
+              <label style={fieldLabelStyle}>Your name *</label>
+              <input
+                type="text"
+                value={state.customerName}
+                onChange={(e) => setState((s) => ({ ...s, customerName: e.target.value }))}
+                placeholder="Jane Smith"
+                style={inputStyle}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && state.customerName.trim()) {
+                    createSessionAndStart();
+                  }
+                }}
+              />
+            </div>
+            <div>
+              <label style={fieldLabelStyle}>Email (optional)</label>
+              <input
+                type="email"
+                value={state.customerEmail}
+                onChange={(e) => setState((s) => ({ ...s, customerEmail: e.target.value }))}
+                placeholder="jane@company.com"
+                style={inputStyle}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && state.customerName.trim()) {
+                    createSessionAndStart();
+                  }
+                }}
+              />
+            </div>
+            <button
+              onClick={createSessionAndStart}
+              disabled={!state.customerName.trim()}
+              style={{
+                ...primaryButtonStyle,
+                opacity: state.customerName.trim() ? 1 : 0.4,
+                cursor: state.customerName.trim() ? "pointer" : "not-allowed",
+              }}
+            >
+              Start interview
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -295,7 +389,6 @@ export default function CollectPage() {
   return (
     <div style={containerStyle}>
       <div style={{ maxWidth: "40rem", width: "100%" }}>
-        {/* Progress bar */}
         <div style={{ marginBottom: "var(--space-2xl)" }}>
           <div style={progressBarStyle}>
             <div
@@ -311,7 +404,6 @@ export default function CollectPage() {
           </p>
         </div>
 
-        {/* Chat messages */}
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-lg)" }}>
           {messages.map((msg, i) => (
             <div key={i}>
@@ -330,7 +422,6 @@ export default function CollectPage() {
           <div ref={chatEndRef} />
         </div>
 
-        {/* Options for current question */}
         {state.question && state.options.length > 0 && (
           <div style={{ marginTop: "var(--space-lg)" }}>
             <div style={optionsContainerStyle}>
@@ -351,7 +442,6 @@ export default function CollectPage() {
               ))}
             </div>
 
-            {/* Custom input for "Write your own answer" */}
             {state.showCustomInput && (
               <div style={{ marginTop: "var(--space-md)" }}>
                 <textarea
@@ -361,7 +451,6 @@ export default function CollectPage() {
                   }
                   placeholder="Type your answer here..."
                   rows={3}
-                  autoFocus
                   style={textareaStyle}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
@@ -373,7 +462,6 @@ export default function CollectPage() {
               </div>
             )}
 
-            {/* Submit button */}
             {state.selectedOption && (
               <button
                 onClick={submitAnswer}
@@ -442,6 +530,29 @@ const primaryButtonStyle: React.CSSProperties = {
   fontSize: "var(--text-body)",
   fontWeight: 500,
   cursor: "pointer",
+};
+
+const fieldLabelStyle: React.CSSProperties = {
+  fontFamily: "var(--font-mono)",
+  fontSize: "var(--text-micro)",
+  color: "var(--text-muted)",
+  textTransform: "uppercase",
+  letterSpacing: "var(--tracking-wide)",
+  display: "block",
+  marginBottom: "var(--space-xs)",
+};
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "var(--space-sm) var(--space-md)",
+  background: "var(--bg-subtle)",
+  border: "1px solid var(--border)",
+  borderRadius: "8px",
+  fontFamily: "var(--font-body)",
+  fontSize: "var(--text-body)",
+  color: "var(--white)",
+  outline: "none",
+  boxSizing: "border-box",
 };
 
 const progressBarStyle: React.CSSProperties = {
