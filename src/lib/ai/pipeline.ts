@@ -228,64 +228,70 @@ async function runWritingPipeline(
   messages: Message[],
   context: InterviewContext
 ): Promise<string> {
-  const sessionDoc = await getSessionById(sessionId);
-  const customerName = sessionDoc?.customerName || "";
-  const customerRole = sessionDoc?.customerRole || "";
-  const customerCompany = sessionDoc?.customerCompany || "";
+  try {
+    const sessionDoc = await getSessionById(sessionId);
+    const customerName = sessionDoc?.customerName || "";
+    const customerRole = sessionDoc?.customerRole || "";
+    const customerCompany = sessionDoc?.customerCompany || "";
 
-  let draft: Agent3Response = await callAgent3(
-    company,
-    messages,
-    context,
-    customerName,
-    customerRole,
-    customerCompany
-  );
-
-  let rewriteCount = 0;
-  let check = await callAgent4(company, draft, messages);
-
-  while (!check.passed && rewriteCount < MAX_REWRITE_ATTEMPTS) {
-    rewriteCount++;
-    draft = await callAgent3WithFeedback(
+    let draft: Agent3Response = await callAgent3(
       company,
       messages,
       context,
-      check.feedback,
-      check.suggestions,
       customerName,
       customerRole,
       customerCompany
     );
-    check = await callAgent4(company, draft, messages);
+
+    let rewriteCount = 0;
+    let check = await callAgent4(company, draft, messages);
+
+    while (!check.passed && rewriteCount < MAX_REWRITE_ATTEMPTS) {
+      rewriteCount++;
+      draft = await callAgent3WithFeedback(
+        company,
+        messages,
+        context,
+        check.feedback,
+        check.suggestions,
+        customerName,
+        customerRole,
+        customerCompany
+      );
+      check = await callAgent4(company, draft, messages);
+    }
+
+    const testimonialData = {
+      sessionId,
+      companyId: company.id,
+      company_name: company.name,
+      generatedText: draft.testimonial,
+      generatedFormats: draft.formats,
+      starRating: draft.starRating,
+      attribution: draft.attribution,
+      highlightedMetrics: draft.highlightedMetrics,
+      authenticityScore: check.score,
+      authenticityIssues: check.issues,
+      rewriteCount,
+      status: check.passed ? "approved" : "pending",
+      user_id: company.userId,
+      raw_answers: messages.filter((m) => m.role === "user").map((m) => m.answer),
+      context_snapshot: context,
+      created_at: FieldValue.serverTimestamp(),
+    };
+
+    const docRef = await adminDb.collection("testimonials").add(testimonialData);
+
+    await adminDb.collection("interview_sessions").doc(sessionId).update({
+      testimonialId: docRef.id,
+    });
+
+    return docRef.id;
+  } catch (err) {
+    console.error("Writing pipeline failed:", err);
+    // Don't propagate the error - we've already updated the session status
+    throw new Error("Writing pipeline failed silently");
   }
-
-  const testimonialData = {
-    sessionId,
-    companyId: company.id,
-    company_name: company.name,
-    generatedText: draft.testimonial,
-    generatedFormats: draft.formats,
-    starRating: draft.starRating,
-    attribution: draft.attribution,
-    highlightedMetrics: draft.highlightedMetrics,
-    authenticityScore: check.score,
-    authenticityIssues: check.issues,
-    rewriteCount,
-    status: check.passed ? "approved" : "pending",
-    user_id: company.userId,
-    raw_answers: messages.filter((m) => m.role === "user").map((m) => m.answer),
-    context_snapshot: context,
-    created_at: FieldValue.serverTimestamp(),
-  };
-
-  const docRef = await adminDb.collection("testimonials").add(testimonialData);
-
-  await adminDb.collection("interview_sessions").doc(sessionId).update({
-    testimonialId: docRef.id,
-  });
-
-  return docRef.id;
 }
 
 // ── Agent 3 with Agent 4 feedback ───────────────────────────────────────────
