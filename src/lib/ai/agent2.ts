@@ -71,7 +71,6 @@ export async function callAgent2(
         ],
         temperature: 0.8,
         max_tokens: 400,
-        response_format: { type: "json_object" },
       }),
     });
 
@@ -104,13 +103,65 @@ function fallbackAgent2(
   question: string,
   company: Company
 ): Agent2Response {
+  const q = question.toLowerCase();
   const name = company.name;
+
+  // Vary options based on question content
+  if (q.includes("challeng") || q.includes("problem") || q.includes("struggle") || q.includes("before")) {
+    return {
+      options: [
+        { id: "a", text: `We were spending hours on manual work every week at ${name}` },
+        { id: "b", text: `Our old process kept breaking down and causing delays` },
+        { id: "c", text: `I was frustrated with how long everything took` },
+        { id: "d", text: `We tried other solutions but nothing quite fit our needs` },
+        { id: "e", text: "Write your own answer" },
+      ],
+    };
+  }
+
+  if (q.includes("impact") || q.includes("effect") || q.includes("consequence") || q.includes("cost")) {
+    return {
+      options: [
+        { id: "a", text: `It was costing us about $2,000 a month in wasted time` },
+        { id: "b", text: `Our team morale was dropping because of the repetitive work` },
+        { id: "c", text: `We were falling behind competitors who had better tools` },
+        { id: "d", text: `Customers started noticing the delays and some left` },
+        { id: "e", text: "Write your own answer" },
+      ],
+    };
+  }
+
+  if (q.includes("different") || q.includes("change") || q.includes("now") || q.includes("after") || q.includes("improv")) {
+    return {
+      options: [
+        { id: "a", text: `We cut our process time in half using ${name}` },
+        { id: "b", text: `Our team can now focus on work that actually matters` },
+        { id: "c", text: `Everything runs smoothly — I barely think about it anymore` },
+        { id: "d", text: `The quality of our output improved dramatically` },
+        { id: "e", text: "Write your own answer" },
+      ],
+    };
+  }
+
+  if (q.includes("recommend") || q.includes("tell") || q.includes("who")) {
+    return {
+      options: [
+        { id: "a", text: `I'd tell any startup founder — just use ${name}` },
+        { id: "b", text: `Anyone in our industry who handles similar workflows` },
+        { id: "c", text: `My whole team already switched after seeing our results` },
+        { id: "d", text: `I posted about it on LinkedIn because I was that impressed` },
+        { id: "e", text: "Write your own answer" },
+      ],
+    };
+  }
+
+  // Generic varied fallback
   return {
     options: [
-      { id: "a", text: `It solved a major problem for our team at ${name}` },
-      { id: "b", text: `We saw real results within the first few weeks` },
-      { id: "c", text: `Our team's productivity improved significantly` },
-      { id: "d", text: `I'd recommend it to anyone in our industry` },
+      { id: "a", text: `It transformed how our team operates at ${name}` },
+      { id: "b", text: `The ROI was clear within the first month` },
+      { id: "c", text: `Honestly, I wish I had found it sooner` },
+      { id: "d", text: `Our clients noticed the improvement immediately` },
       { id: "e", text: "Write your own answer" },
     ],
   };

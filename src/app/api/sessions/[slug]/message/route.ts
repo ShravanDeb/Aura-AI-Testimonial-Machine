@@ -1,17 +1,27 @@
 import { NextResponse } from "next/server";
-import { runInterviewRound, processAnswer, getSessionBySlug } from "@/lib/ai/pipeline";
+import { runInterviewRound, processAnswer } from "@/lib/ai/pipeline";
+import { getSessionById } from "@/lib/ai/pipeline";
 
 // POST — Process a customer answer and get the next question
+// Accepts either slug (via URL) or sessionId (via body) for session lookup
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
     const { slug } = await params;
-    const { answer, selectedOptionId, action } = await request.json();
+    const body = await request.json();
+    const { answer, selectedOptionId, action, sessionId: bodySessionId } = body;
 
-    // Get session by slug
-    const session = await getSessionBySlug(slug);
+    // Prefer sessionId from body (direct doc lookup), fall back to slug query
+    let session;
+    if (bodySessionId) {
+      session = await getSessionById(bodySessionId);
+    } else {
+      const { getSessionBySlug } = await import("@/lib/ai/pipeline");
+      session = await getSessionBySlug(slug);
+    }
+
     if (!session) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }

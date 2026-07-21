@@ -22,6 +22,7 @@ interface InterviewState {
   polished: string;
   companyId: string;
   sessionSlug: string;
+  sessionId: string;
   customerName: string;
   customerEmail: string;
 }
@@ -44,6 +45,7 @@ export default function CollectPage() {
     polished: "",
     companyId: "",
     sessionSlug: "",
+    sessionId: "",
     customerName: "",
     customerEmail: "",
   });
@@ -124,15 +126,15 @@ export default function CollectPage() {
       });
 
       if (!createRes.ok) throw new Error("Failed to create session");
-      const { slug: newSlug } = await createRes.json();
+      const { sessionId: newSessionId, slug: newSlug } = await createRes.json();
 
-      setState((s) => ({ ...s, sessionSlug: newSlug }));
+      setState((s) => ({ ...s, sessionSlug: newSlug, sessionId: newSessionId }));
 
       // Start the interview
       const startRes = await fetch(`/api/sessions/${newSlug}/message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "start" }),
+        body: JSON.stringify({ action: "start", sessionId: newSessionId }),
       });
 
       if (!startRes.ok) throw new Error("Failed to start interview");
@@ -211,7 +213,7 @@ export default function CollectPage() {
       const res = await fetch(`/api/sessions/${state.sessionSlug}/message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "answer", answer, selectedOptionId }),
+        body: JSON.stringify({ action: "answer", answer, selectedOptionId, sessionId: state.sessionId }),
       });
 
       if (!res.ok) throw new Error("Failed to process answer");
@@ -245,7 +247,7 @@ export default function CollectPage() {
         error: "Something went wrong. Please try again.",
       }));
     }
-  }, [state.sessionSlug, state.selectedOption, state.options, state.showCustomInput, state.customAnswer]);
+  }, [state.sessionSlug, state.sessionId, state.selectedOption, state.options, state.showCustomInput, state.customAnswer]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
