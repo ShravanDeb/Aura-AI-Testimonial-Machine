@@ -247,30 +247,6 @@ export default function Experience() {
     []
   );
 
-  const runProcessing = useCallback(
-    (allAnswers: string[]) => {
-      if (!procMsgRef.current) return;
-
-      const tl = gsap.timeline();
-
-      PROCESSING_MESSAGES.forEach((msg) => {
-        tl.call(() => { if (procMsgRef.current) procMsgRef.current.textContent = msg; });
-        tl.fromTo(procMsgRef.current!, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.25, ease: "power2.out" });
-        tl.to({}, { duration: 0.2 });
-        tl.to(procMsgRef.current!, { opacity: 0, y: -10, duration: 0.2, ease: "power2.in" });
-      });
-
-      const combined = allAnswers.join(". ");
-      const polished = polishText(combined);
-      setPolishedWords(polished.split(" "));
-
-      tl.call(() => {
-        transitionTo("processing", "reveal", () => { startReveal(); });
-      });
-    },
-    [transitionTo]
-  );
-
   const startReveal = useCallback(() => {
     const tl = gsap.timeline({ onComplete: () => { unlock(); } });
 
@@ -298,6 +274,39 @@ export default function Experience() {
 
     tl.to({}, { duration: 1 });
   }, [unlock]);
+
+  const runProcessing = useCallback(
+    (allAnswers: string[]) => {
+      if (!procMsgRef.current) return;
+
+      const tl = gsap.timeline();
+
+      PROCESSING_MESSAGES.forEach((msg) => {
+        tl.call(() => { if (procMsgRef.current) procMsgRef.current.textContent = msg; });
+        tl.fromTo(procMsgRef.current!, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.25, ease: "power2.out" });
+        tl.to({}, { duration: 0.2 });
+        tl.to(procMsgRef.current!, { opacity: 0, y: -10, duration: 0.2, ease: "power2.in" });
+      });
+
+      const combined = allAnswers.join(". ");
+
+      tl.call(async () => {
+        try {
+          const res = await fetch("/api/polish", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: combined }),
+          });
+          const data = await res.json();
+          setPolishedWords((data.polished || polishText(combined)).split(" "));
+        } catch {
+          setPolishedWords(polishText(combined).split(" "));
+        }
+        transitionTo("processing", "reveal", () => { startReveal(); });
+      });
+    },
+    [transitionTo, startReveal]
+  );
 
   const submitAnswer = useCallback((textOverride?: string) => {
     if (inputLocked.current) return;

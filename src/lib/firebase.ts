@@ -21,6 +21,8 @@ import {
   query,
   where,
   orderBy,
+  limit,
+  getDoc,
   serverTimestamp,
 } from "firebase/firestore";
 
@@ -57,5 +59,7 @@ export {
   query,
   where,
   orderBy,
+  limit,
+  getDoc,
   serverTimestamp,
 };

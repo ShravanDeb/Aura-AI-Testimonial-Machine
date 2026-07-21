@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 
-export async function GET() {
-  return NextResponse.json({ error: "Firebase handles data client-side" }, { status: 501 });
-}
+// Campaign data is fetched client-side via Firestore (no admin SDK needed)
+// This endpoint is for server-side operations if needed in the future
 
-export async function POST() {
-  return NextResponse.json({ error: "Firebase handles data client-side" }, { status: 501 });
+export async function GET() {
+  return NextResponse.json({
+    error: "Campaign data is fetched client-side. Use the collect page directly.",
+    hint: "GET /api/campaigns?token=YOUR_SHARE_TOKEN — coming soon with Firebase Admin SDK"
+  }, { status: 501 });
 }
