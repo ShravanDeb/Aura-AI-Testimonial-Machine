@@ -62,21 +62,25 @@ export async function POST(request: Request) {
 
 // GET — Get session by slug, OR lookup company by share_token
 export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const slug = url.searchParams.get("slug");
+
+  if (!slug) {
+    return NextResponse.json({ error: "slug is required" }, { status: 400 });
+  }
+
+  // Try session lookup — don't let it block company lookup
   try {
-    const url = new URL(request.url);
-    const slug = url.searchParams.get("slug");
-
-    if (!slug) {
-      return NextResponse.json({ error: "slug is required" }, { status: 400 });
-    }
-
-    // First: try to find an existing interview session
     const session = await getSessionBySlug(slug);
     if (session) {
       return NextResponse.json({ type: "session", ...session });
     }
+  } catch (err) {
+    console.error("Session lookup failed, trying company:", err);
+  }
 
-    // Second: try to find a company by share_token
+  // Try company lookup by share_token
+  try {
     const companySnap = await getDocs(
       query(
         collection(db, "campaigns"),
@@ -86,11 +90,11 @@ export async function GET(request: Request) {
     );
 
     if (!companySnap.empty) {
-      const doc = companySnap.docs[0];
-      const data = doc.data();
+      const companyDoc = companySnap.docs[0];
+      const data = companyDoc.data();
       return NextResponse.json({
         type: "company",
-        companyId: doc.id,
+        companyId: companyDoc.id,
         company_name: data.name || "Unknown",
         company_description: data.description || "",
         company_target_audience: data.target_audience || "customers",
@@ -98,13 +102,9 @@ export async function GET(request: Request) {
         status: "active",
       });
     }
-
-    return NextResponse.json({ error: "Session not found" }, { status: 404 });
   } catch (err) {
-    console.error("Session lookup error:", err);
-    return NextResponse.json(
-      { error: "Failed to fetch session" },
-      { status: 500 }
-    );
+    console.error("Company lookup failed:", err);
   }
+
+  return NextResponse.json({ error: "Session not found" }, { status: 404 });
 }
