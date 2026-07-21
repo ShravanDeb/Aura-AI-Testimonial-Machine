@@ -2,7 +2,7 @@
 // Model: Groq Qwen 3.6 27B — fast JSON output, 500+ TPS on Groq LPU
 // Role: Generate 5 multiple-choice options for each question
 
-import { GROQ_URL, AGENT2_MODEL } from "./config";
+import { OPENROUTER_URL, AGENT2_MODEL } from "./config";
 import type { Company, Message, Agent2Response } from "./types";
 
 const SYSTEM_PROMPT = (company: Company, previousAnswers: string[]) =>
@@ -45,17 +45,19 @@ export async function callAgent2(
     .filter((m) => m.role === "user")
     .map((m) => m.answer);
 
-  const apiKey = process.env.GROQ_API_KEY;
+  const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     return fallbackAgent2(question, company);
   }
 
   try {
-    const res = await fetch(GROQ_URL, {
+    const res = await fetch(OPENROUTER_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
+        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+        "X-Title": "Aura AI Testimonial Machine",
       },
       body: JSON.stringify({
         model: AGENT2_MODEL,
