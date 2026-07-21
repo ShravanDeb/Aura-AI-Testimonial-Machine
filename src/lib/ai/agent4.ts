@@ -87,6 +87,7 @@ Score it and check all authenticity criteria.`,
         ],
         temperature: 0.3,
         max_tokens: 500,
+        reasoning: { effort: "none" },
       }),
     });
 

@@ -73,6 +73,7 @@ export async function callAgent2(
         ],
         temperature: 0.8,
         max_tokens: 400,
+        reasoning: { effort: "none" },
       }),
     });
 

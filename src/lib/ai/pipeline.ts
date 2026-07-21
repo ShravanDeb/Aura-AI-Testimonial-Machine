@@ -372,6 +372,7 @@ Respond with valid JSON matching the Agent 3 schema.`,
         ],
         temperature: 0.7,
         max_tokens: 800,
+        reasoning: { effort: "none" },
       }),
     });
 
