@@ -10,7 +10,6 @@ import {
   getDocs,
   query,
   where,
-  orderBy,
   limit,
   updateDoc,
   deleteDoc,
@@ -92,24 +91,32 @@ export default function CompanyDetailPage() {
         const sessSnap = await getDocs(
           query(
             collection(db, "interview_sessions"),
-            where("companyId", "==", companyId),
-            orderBy("created_at", "desc")
+            where("companyId", "==", companyId)
           )
         );
         const sessItems: Session[] = [];
         sessSnap.forEach((d) => sessItems.push({ id: d.id, ...d.data() } as Session));
+        sessItems.sort((a, b) => {
+          const aTime = typeof a.created_at === "string" ? new Date(a.created_at).getTime() : (a.created_at?.seconds || 0) * 1000;
+          const bTime = typeof b.created_at === "string" ? new Date(b.created_at).getTime() : (b.created_at?.seconds || 0) * 1000;
+          return bTime - aTime;
+        });
         setSessions(sessItems);
 
         // Fetch testimonials for this company
         const testSnap = await getDocs(
           query(
             collection(db, "testimonials"),
-            where("companyId", "==", companyId),
-            orderBy("created_at", "desc")
+            where("companyId", "==", companyId)
           )
         );
         const testItems: Testimonial[] = [];
         testSnap.forEach((d) => testItems.push({ id: d.id, ...d.data() } as Testimonial));
+        testItems.sort((a, b) => {
+          const aTime = typeof a.created_at === "string" ? new Date(a.created_at).getTime() : (a.created_at?.seconds || 0) * 1000;
+          const bTime = typeof b.created_at === "string" ? new Date(b.created_at).getTime() : (b.created_at?.seconds || 0) * 1000;
+          return bTime - aTime;
+        });
         setTestimonials(testItems);
       } catch {
         // Firestore not configured

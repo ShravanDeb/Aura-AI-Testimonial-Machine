@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { auth, db, collection, getDocs, query, where, orderBy } from "@/lib/firebase";
+import { auth, db, collection, getDocs, query, where } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 
 interface Stats {
@@ -34,7 +34,7 @@ export default function DashboardPage() {
 
       try {
         const campaignSnap = await getDocs(query(collection(db, "campaigns"), where("user_id", "==", user.uid)));
-        const testimonialSnap = await getDocs(query(collection(db, "testimonials"), where("user_id", "==", user.uid), orderBy("created_at", "desc")));
+        const testimonialSnap = await getDocs(query(collection(db, "testimonials"), where("user_id", "==", user.uid)));
 
         setStats({
           totalCampaigns: campaignSnap.size,
@@ -43,11 +43,14 @@ export default function DashboardPage() {
 
         const items: RecentTestimonial[] = [];
         testimonialSnap.forEach((d) => {
-          if (items.length < 5) {
-            items.push({ id: d.id, ...d.data() } as RecentTestimonial);
-          }
+          items.push({ id: d.id, ...d.data() } as RecentTestimonial);
         });
-        setRecent(items);
+        items.sort((a, b) => {
+          const aTime = typeof a.created_at === "string" ? new Date(a.created_at).getTime() : 0;
+          const bTime = typeof b.created_at === "string" ? new Date(b.created_at).getTime() : 0;
+          return bTime - aTime;
+        });
+        setRecent(items.slice(0, 5));
       } catch {
         // Firestore not configured yet
       }

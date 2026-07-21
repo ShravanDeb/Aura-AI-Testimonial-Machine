@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { auth, db, collection, getDocs, query, where, orderBy, deleteDoc, updateDoc, doc } from "@/lib/firebase";
+import { auth, db, collection, getDocs, query, where, deleteDoc, updateDoc, doc } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 
 interface Campaign {
@@ -32,9 +32,14 @@ export default function CampaignsPage() {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) return;
       try {
-        const snap = await getDocs(query(collection(db, "campaigns"), where("user_id", "==", user.uid), orderBy("created_at", "desc")));
+        const snap = await getDocs(query(collection(db, "campaigns"), where("user_id", "==", user.uid)));
         const items: Campaign[] = [];
         snap.forEach((d) => items.push({ id: d.id, ...d.data() } as Campaign));
+        items.sort((a, b) => {
+          const aTime = typeof a.created_at === "string" ? new Date(a.created_at).getTime() : 0;
+          const bTime = typeof b.created_at === "string" ? new Date(b.created_at).getTime() : 0;
+          return bTime - aTime;
+        });
         setCampaigns(items);
       } catch {
         // Firestore not configured

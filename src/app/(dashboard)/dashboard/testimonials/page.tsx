@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { auth, db, collection, getDocs, query, where, orderBy, deleteDoc, updateDoc, doc } from "@/lib/firebase";
+import { auth, db, collection, getDocs, query, where, deleteDoc, updateDoc, doc } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 
 interface Testimonial {
@@ -30,13 +30,18 @@ export default function TestimonialsPage() {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) return;
       try {
-        let q = query(collection(db, "testimonials"), where("user_id", "==", user.uid), orderBy("created_at", "desc"));
+        let q = query(collection(db, "testimonials"), where("user_id", "==", user.uid));
         if (filter !== "all") {
           q = query(collection(db, "testimonials"), where("user_id", "==", user.uid), where("status", "==", filter));
         }
         const snap = await getDocs(q);
         const items: Testimonial[] = [];
         snap.forEach((d) => items.push({ id: d.id, ...d.data() } as Testimonial));
+        items.sort((a, b) => {
+          const aTime = typeof a.created_at === "string" ? new Date(a.created_at).getTime() : 0;
+          const bTime = typeof b.created_at === "string" ? new Date(b.created_at).getTime() : 0;
+          return bTime - aTime;
+        });
         setTestimonials(items);
       } catch {
         // Firestore not configured

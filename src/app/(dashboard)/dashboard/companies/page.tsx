@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { auth, db, collection, getDocs, query, where, orderBy, deleteDoc, doc } from "@/lib/firebase";
+import { auth, db, collection, getDocs, query, where, deleteDoc, doc } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 
 interface Company {
@@ -30,18 +30,24 @@ export default function CompaniesPage() {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) return;
       try {
+        // No orderBy — avoids needing composite index
         const snap = await getDocs(
           query(
             collection(db, "campaigns"),
-            where("user_id", "==", user.uid),
-            orderBy("created_at", "desc")
+            where("user_id", "==", user.uid)
           )
         );
         const items: Company[] = [];
         snap.forEach((d) => items.push({ id: d.id, ...d.data() } as Company));
+        // Sort client-side
+        items.sort((a, b) => {
+          const aTime = typeof a.created_at === "string" ? new Date(a.created_at).getTime() : (a.created_at?.seconds || 0) * 1000;
+          const bTime = typeof b.created_at === "string" ? new Date(b.created_at).getTime() : (b.created_at?.seconds || 0) * 1000;
+          return bTime - aTime;
+        });
         setCompanies(items);
-      } catch {
-        // Firestore not configured
+      } catch (err) {
+        console.error("Failed to load companies:", err);
       }
       setLoading(false);
     });
@@ -114,33 +120,18 @@ export default function CompaniesPage() {
                   <p style={metaStyle}>{c.response_count || 0} responses &middot; Created {formatDate(c.created_at)}</p>
                 </div>
                 <div style={{ display: "flex", gap: "var(--space-xs)" }}>
-                  <Link
-                    href={`/dashboard/companies/${c.id}`}
-                    style={actionButtonStyle}
-                  >
-                    View
-                  </Link>
-                  <button
-                    onClick={() => copyLink(getShareUrl(c.share_token), `collect-${c.id}`)}
-                    style={{ ...actionButtonStyle, color: copiedId === `collect-${c.id}` ? "#22c55e" : "var(--text-muted)" }}
-                  >
+                  <Link href={`/dashboard/companies/${c.id}`} style={actionButtonStyle}>View</Link>
+                  <button onClick={() => copyLink(getShareUrl(c.share_token), `collect-${c.id}`)} style={{ ...actionButtonStyle, color: copiedId === `collect-${c.id}` ? "#22c55e" : "var(--text-muted)" }}>
                     {copiedId === `collect-${c.id}` ? "Copied!" : "Copy Link"}
                   </button>
-                  <button
-                    onClick={() => copyLink(getWallUrl(c.share_token), `wall-${c.id}`)}
-                    style={{ ...actionButtonStyle, color: copiedId === `wall-${c.id}` ? "#22c55e" : "var(--text-muted)" }}
-                  >
+                  <button onClick={() => copyLink(getWallUrl(c.share_token), `wall-${c.id}`)} style={{ ...actionButtonStyle, color: copiedId === `wall-${c.id}` ? "#22c55e" : "var(--text-muted)" }}>
                     {copiedId === `wall-${c.id}` ? "Copied!" : "Wall"}
                   </button>
-                  <button onClick={() => deleteCompany(c.id)} style={{ ...actionButtonStyle, color: "var(--text-dim)" }}>
-                    Delete
-                  </button>
+                  <button onClick={() => deleteCompany(c.id)} style={{ ...actionButtonStyle, color: "var(--text-dim)" }}>Delete</button>
                 </div>
               </div>
               {c.description && (
-                <p style={{ fontFamily: "var(--font-body)", fontSize: "var(--text-small)", color: "var(--text-muted)", lineHeight: 1.5 }}>
-                  {c.description}
-                </p>
+                <p style={{ fontFamily: "var(--font-body)", fontSize: "var(--text-small)", color: "var(--text-muted)", lineHeight: 1.5 }}>{c.description}</p>
               )}
             </div>
           ))}
@@ -168,60 +159,10 @@ function statusBadge(active: boolean) {
   };
 }
 
-const headingStyle: React.CSSProperties = {
-  fontFamily: "var(--font-serif)",
-  fontSize: "var(--text-h2)",
-  color: "var(--white)",
-  marginBottom: "var(--space-xs)",
-};
-
-const mutedStyle: React.CSSProperties = {
-  fontFamily: "var(--font-body)",
-  fontSize: "var(--text-small)",
-  color: "var(--text-muted)",
-};
-
-const metaStyle: React.CSSProperties = {
-  fontFamily: "var(--font-mono)",
-  fontSize: "var(--text-micro)",
-  color: "var(--text-dim)",
-};
-
-const primaryButtonStyle: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "var(--space-xs)",
-  padding: "var(--space-sm) var(--space-lg)",
-  background: "var(--white)",
-  color: "var(--bg)",
-  borderRadius: "8px",
-  fontFamily: "var(--font-body)",
-  fontSize: "var(--text-small)",
-  fontWeight: 500,
-  flexShrink: 0,
-};
-
-const emptyStyle: React.CSSProperties = {
-  padding: "var(--space-4xl)",
-  border: "1px dashed var(--border)",
-  borderRadius: "12px",
-  textAlign: "center",
-};
-
-const cardStyle: React.CSSProperties = {
-  padding: "var(--space-lg)",
-  background: "var(--bg-subtle)",
-  border: "1px solid var(--border)",
-  borderRadius: "12px",
-};
-
-const actionButtonStyle: React.CSSProperties = {
-  padding: "4px var(--space-sm)",
-  borderRadius: "4px",
-  fontFamily: "var(--font-mono)",
-  fontSize: "var(--text-micro)",
-  color: "var(--text-muted)",
-  border: "1px solid var(--border)",
-  textTransform: "uppercase",
-  letterSpacing: "var(--tracking-wide)",
-};
+const headingStyle: React.CSSProperties = { fontFamily: "var(--font-serif)", fontSize: "var(--text-h2)", color: "var(--white)", marginBottom: "var(--space-xs)" };
+const mutedStyle: React.CSSProperties = { fontFamily: "var(--font-body)", fontSize: "var(--text-small)", color: "var(--text-muted)" };
+const metaStyle: React.CSSProperties = { fontFamily: "var(--font-mono)", fontSize: "var(--text-micro)", color: "var(--text-dim)" };
+const primaryButtonStyle: React.CSSProperties = { display: "flex", alignItems: "center", gap: "var(--space-xs)", padding: "var(--space-sm) var(--space-lg)", background: "var(--white)", color: "var(--bg)", borderRadius: "8px", fontFamily: "var(--font-body)", fontSize: "var(--text-small)", fontWeight: 500, flexShrink: 0 };
+const emptyStyle: React.CSSProperties = { padding: "var(--space-4xl)", border: "1px dashed var(--border)", borderRadius: "12px", textAlign: "center" };
+const cardStyle: React.CSSProperties = { padding: "var(--space-lg)", background: "var(--bg-subtle)", border: "1px solid var(--border)", borderRadius: "12px" };
+const actionButtonStyle: React.CSSProperties = { padding: "4px var(--space-sm)", borderRadius: "4px", fontFamily: "var(--font-mono)", fontSize: "var(--text-micro)", color: "var(--text-muted)", border: "1px solid var(--border)", textTransform: "uppercase", letterSpacing: "var(--tracking-wide)" };
