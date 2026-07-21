@@ -85,6 +85,18 @@ export async function getSessionBySlug(slug: string) {
   return { id: d.id, ...d.data() } as SessionDoc;
 }
 
+// ── Get session by ID ─────────────────────────────────────────────────────
+
+export async function getSessionById(sessionId: string): Promise<SessionDoc | null> {
+  try {
+    const snap = await adminDb.collection("interview_sessions").doc(sessionId).get();
+    if (!snap.exists) return null;
+    return { id: snap.id, ...snap.data()! } as SessionDoc;
+  } catch {
+    return null;
+  }
+}
+
 // ── Run one interview round (Agent 1 → Agent 2) ─────────────────────────────
 
 export async function runInterviewRound(sessionId: string) {
@@ -222,7 +234,7 @@ export async function processAnswer(
 
 // ── Agent 3+4 Writing Pipeline ───────────────────────────────────────────────
 
-async function runWritingPipeline(
+export async function runWritingPipeline(
   sessionId: string,
   company: Company,
   messages: Message[],
@@ -420,14 +432,13 @@ async function forceComplete(
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-export async function getSessionById(sessionId: string): Promise<SessionDoc | null> {
-  try {
-    const snap = await adminDb.collection("interview_sessions").doc(sessionId).get();
-    if (!snap.exists) return null;
-    return { id: snap.id, ...snap.data()! } as SessionDoc;
-  } catch {
-    return null;
+function generateSlug(): string {
+  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let slug = "";
+  for (let i = 0; i < 8; i++) {
+    slug += chars[Math.floor(Math.random() * chars.length)];
   }
+  return slug;
 }
 
 function inferContextFromAnswer(
@@ -508,13 +519,4 @@ function inferContextFromAnswer(
   updated.completeness = Math.round((filled / 4) * 100);
 
   return updated;
-}
-
-function generateSlug(): string {
-  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-  let slug = "";
-  for (let i = 0; i < 8; i++) {
-    slug += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return slug;
 }

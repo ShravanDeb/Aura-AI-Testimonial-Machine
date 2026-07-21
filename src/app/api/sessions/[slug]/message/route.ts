@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { runInterviewRound, processAnswer } from "@/lib/ai/pipeline";
+import { runInterviewRound, processAnswer, getSessionById } from "@/lib/ai/pipeline";
 import { runWritingPipeline } from "@/lib/ai/pipeline";
 import { adminDb } from "@/lib/firebase-admin";
 
@@ -73,7 +73,7 @@ export async function POST(
           });
         }
       })();
-      return NextResponse.json({ ...result, testimonialId: result.testimonialId || null });
+      return NextResponse.json(result);
 
     return NextResponse.json(
       { error: "action must be 'start' or 'answer'" },
