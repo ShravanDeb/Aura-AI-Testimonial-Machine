@@ -1,13 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSessionBySlug } from "@/lib/ai/pipeline";
-import {
-  db,
-  collection,
-  query,
-  where,
-  limit,
-  getDocs,
-} from "@/lib/firebase";
+import { adminDb } from "@/lib/firebase-admin";
 
 // POST — Create a new interview session
 export async function POST(request: Request) {
@@ -21,17 +13,14 @@ export async function POST(request: Request) {
       );
     }
 
-    // Fetch company details from Firestore
-    const companySnap = await getDocs(
-      query(collection(db, "campaigns"), where("__name__", "==", companyId), limit(1))
-    );
+    // Fetch company details from Firestore using admin SDK
+    const companyDoc = await adminDb.collection("campaigns").doc(companyId).get();
 
-    if (companySnap.empty) {
+    if (!companyDoc.exists) {
       return NextResponse.json({ error: "Company not found" }, { status: 404 });
     }
 
-    const companyDoc = companySnap.docs[0];
-    const companyData = companyDoc.data();
+    const companyData = companyDoc.data()!;
 
     const company = {
       id: companyDoc.id,
@@ -69,32 +58,36 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "slug is required" }, { status: 400 });
   }
 
-  // Try session lookup — don't let it block company lookup
+  // Try session lookup first
   try {
-    const session = await getSessionBySlug(slug);
-    if (session) {
-      return NextResponse.json({ type: "session", ...session });
+    const sessionSnap = await adminDb
+      .collection("interview_sessions")
+      .where("slug", "==", slug)
+      .limit(1)
+      .get();
+
+    if (!sessionSnap.empty) {
+      const doc = sessionSnap.docs[0];
+      return NextResponse.json({ type: "session", id: doc.id, ...doc.data() });
     }
   } catch (err) {
-    console.error("Session lookup failed, trying company:", err);
+    console.error("Session lookup failed:", err);
   }
 
   // Try company lookup by share_token
   try {
-    const companySnap = await getDocs(
-      query(
-        collection(db, "campaigns"),
-        where("share_token", "==", slug),
-        limit(1)
-      )
-    );
+    const companySnap = await adminDb
+      .collection("campaigns")
+      .where("share_token", "==", slug)
+      .limit(1)
+      .get();
 
     if (!companySnap.empty) {
-      const companyDoc = companySnap.docs[0];
-      const data = companyDoc.data();
+      const doc = companySnap.docs[0];
+      const data = doc.data();
       return NextResponse.json({
         type: "company",
-        companyId: companyDoc.id,
+        companyId: doc.id,
         company_name: data.name || "Unknown",
         company_description: data.description || "",
         company_target_audience: data.target_audience || "customers",

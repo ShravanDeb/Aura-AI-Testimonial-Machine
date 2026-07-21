@@ -1,19 +1,8 @@
 // ── Interview Pipeline Orchestrator ───────────────────────────────────────────
 // Runs Agent 1+2 in rounds until interview is complete, then Agent 3+4
 
-import {
-  db,
-  collection,
-  addDoc,
-  getDocs,
-  query,
-  where,
-  limit,
-  getDoc,
-  updateDoc,
-  doc,
-  serverTimestamp,
-} from "@/lib/firebase";
+import { adminDb } from "@/lib/firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
 import { callAgent1 } from "./agent1";
 import { callAgent2 } from "./agent2";
 import { callAgent3 } from "./agent3";
@@ -73,11 +62,11 @@ export async function createSession(
     context: createEmptyContext(),
     status: "active",
     testimonialId: null,
-    created_at: serverTimestamp(),
+    created_at: FieldValue.serverTimestamp(),
     completed_at: null,
   };
 
-  const docRef = await addDoc(collection(db, "interview_sessions"), sessionData);
+  const docRef = await adminDb.collection("interview_sessions").add(sessionData);
 
   return { sessionId: docRef.id, slug };
 }
@@ -85,12 +74,12 @@ export async function createSession(
 // ── Get session by slug ─────────────────────────────────────────────────────
 
 export async function getSessionBySlug(slug: string) {
-  const q = query(
-    collection(db, "interview_sessions"),
-    where("slug", "==", slug),
-    limit(1)
-  );
-  const snap = await getDocs(q);
+  const snap = await adminDb
+    .collection("interview_sessions")
+    .where("slug", "==", slug)
+    .limit(1)
+    .get();
+
   if (snap.empty) return null;
   const d = snap.docs[0];
   return { id: d.id, ...d.data() } as SessionDoc;
@@ -127,8 +116,7 @@ export async function runInterviewRound(sessionId: string) {
 
   // 3. Check if Agent 1 says we have enough info
   if (agent1.ready && agent1.summary) {
-    // Update context with final summary
-    await updateDoc(doc(db, "interview_sessions", sessionId), {
+    await adminDb.collection("interview_sessions").doc(sessionId).update({
       context: {
         ...context,
         ...agent1.summary,
@@ -136,10 +124,9 @@ export async function runInterviewRound(sessionId: string) {
         completeness: 100,
       },
       status: "completed",
-      completed_at: serverTimestamp(),
+      completed_at: FieldValue.serverTimestamp(),
     });
 
-    // Trigger Agent 3+4 pipeline
     const testimonialId = await runWritingPipeline(
       sessionId,
       company,
@@ -170,7 +157,7 @@ export async function runInterviewRound(sessionId: string) {
   const updatedMessages = [...messages, assistantMsg];
 
   // 6. Update context and messages in DB
-  await updateDoc(doc(db, "interview_sessions", sessionId), {
+  await adminDb.collection("interview_sessions").doc(sessionId).update({
     messages: updatedMessages,
     context: {
       ...context,
@@ -204,22 +191,19 @@ export async function processAnswer(
   const messages: Message[] = sessionDoc.messages || [];
   const context: InterviewContext = sessionDoc.context || createEmptyContext();
 
-  // Add the user's answer to messages
   const userMsg: Message = {
     role: "user",
     answer,
     selectedOptionId,
   };
 
-  // Update context based on answer content
   const updatedContext = inferContextFromAnswer(context, answer);
 
-  await updateDoc(doc(db, "interview_sessions", sessionId), {
+  await adminDb.collection("interview_sessions").doc(sessionId).update({
     messages: [...messages, userMsg],
     context: updatedContext,
   });
 
-  // Now run the next interview round
   return runInterviewRound(sessionId);
 }
 
@@ -236,7 +220,6 @@ async function runWritingPipeline(
   const customerRole = sessionDoc?.customerRole || "";
   const customerCompany = sessionDoc?.customerCompany || "";
 
-  // AGENT 3 — Write the testimonial
   let draft: Agent3Response = await callAgent3(
     company,
     messages,
@@ -246,13 +229,11 @@ async function runWritingPipeline(
     customerCompany
   );
 
-  // AGENT 4 — Check authenticity (with rewrite loop)
   let rewriteCount = 0;
   let check = await callAgent4(company, draft, messages);
 
   while (!check.passed && rewriteCount < MAX_REWRITE_ATTEMPTS) {
     rewriteCount++;
-    // Re-run Agent 3 with Agent 4's feedback
     draft = await callAgent3WithFeedback(
       company,
       messages,
@@ -266,7 +247,6 @@ async function runWritingPipeline(
     check = await callAgent4(company, draft, messages);
   }
 
-  // Save testimonial to DB
   const testimonialData = {
     sessionId,
     companyId: company.id,
@@ -280,15 +260,15 @@ async function runWritingPipeline(
     authenticityIssues: check.issues,
     rewriteCount,
     status: check.passed ? "approved" : "pending",
+    user_id: company.userId,
     raw_answers: messages.filter((m) => m.role === "user").map((m) => m.answer),
     context_snapshot: context,
-    created_at: serverTimestamp(),
+    created_at: FieldValue.serverTimestamp(),
   };
 
-  const docRef = await addDoc(collection(db, "testimonials"), testimonialData);
+  const docRef = await adminDb.collection("testimonials").add(testimonialData);
 
-  // Link testimonial to session
-  await updateDoc(doc(db, "interview_sessions", sessionId), {
+  await adminDb.collection("interview_sessions").doc(sessionId).update({
     testimonialId: docRef.id,
   });
 
@@ -382,15 +362,15 @@ Respond with valid JSON matching the Agent 3 schema.`,
 // ── Force complete when max rounds reached ───────────────────────────────────
 
 async function forceComplete(
-  sessionDoc: any,
+  sessionDoc: SessionDoc,
   company: Company,
   messages: Message[],
   context: InterviewContext
 ) {
-  await updateDoc(doc(db, "interview_sessions", sessionDoc.id), {
+  await adminDb.collection("interview_sessions").doc(sessionDoc.id).update({
     context: { ...context, readyForAgent3: true, completeness: 100 },
     status: "completed",
-    completed_at: serverTimestamp(),
+    completed_at: FieldValue.serverTimestamp(),
   });
 
   const testimonialId = await runWritingPipeline(
@@ -411,9 +391,9 @@ async function forceComplete(
 
 async function getSessionById(sessionId: string): Promise<SessionDoc | null> {
   try {
-    const snap = await getDoc(doc(db, "interview_sessions", sessionId));
-    if (!snap.exists()) return null;
-    return { id: snap.id, ...snap.data() } as SessionDoc;
+    const snap = await adminDb.collection("interview_sessions").doc(sessionId).get();
+    if (!snap.exists) return null;
+    return { id: snap.id, ...snap.data()! } as SessionDoc;
   } catch {
     return null;
   }
@@ -426,7 +406,6 @@ function inferContextFromAnswer(
   const lower = answer.toLowerCase();
   const updated = { ...context };
 
-  // Simple keyword-based pillar detection
   if (
     !updated.problem &&
     (lower.includes("before") ||
@@ -470,7 +449,6 @@ function inferContextFromAnswer(
     updated.recommendation = answer;
   }
 
-  // Detect metrics
   const metricPatterns = [
     { regex: /(\d+)\s*hours?/i, type: "time" as const },
     { regex: /(\d+)\s*minutes?/i, type: "time" as const },
@@ -494,7 +472,6 @@ function inferContextFromAnswer(
     }
   }
 
-  // Update completeness
   const pillars = [updated.problem, updated.impact, updated.transformation, updated.recommendation];
   const filled = pillars.filter(Boolean).length;
   updated.completeness = Math.round((filled / 4) * 100);
