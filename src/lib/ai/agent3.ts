@@ -67,7 +67,7 @@ export async function callAgent3(
   customerRole?: string,
   customerCompany?: string
 ): Promise<Agent3Response> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     return fallbackAgent3(company, messages, context, customerName);
   }
@@ -122,14 +122,25 @@ function fallbackAgent3(
   context: InterviewContext,
   customerName?: string
 ): Agent3Response {
-  const parts: string[] = [];
-  if (context.problem) parts.push(`Before ${company.name}, ${context.problem.toLowerCase()}`);
-  if (context.impact) parts.push(`This meant ${context.impact.toLowerCase()}`);
-  if (context.transformation) parts.push(`Now, ${context.transformation.toLowerCase()}`);
-  if (context.recommendation) parts.push(`I'd tell ${context.recommendation.toLowerCase()}`);
-
-  const testimonial = parts.join(". ") + ".";
+  const answers = messages.filter((m) => m.role === "user").map((m) => m.answer);
   const name = customerName || "A valued customer";
+
+  let testimonial = "";
+  if (answers.length >= 3) {
+    testimonial = `Before ${company.name}, ${answers[0][0].toLowerCase() + answers[0].slice(1)} ${answers[1][0].toLowerCase() + answers[1].slice(1)} Now, ${answers[2][0].toLowerCase() + answers[2].slice(1)}`;
+  } else if (answers.length >= 1) {
+    testimonial = answers.join(" ");
+  } else {
+    testimonial = `I love using ${company.name}.`;
+  }
+
+  const sentences = testimonial.split(/(?<=[.!?])\s+/);
+  if (sentences.length > 4) {
+    testimonial = sentences.slice(0, 4).join(" ");
+  }
+  if (!testimonial.endsWith(".") && !testimonial.endsWith("!") && !testimonial.endsWith("?")) {
+    testimonial += ".";
+  }
 
   return {
     testimonial,
@@ -142,7 +153,7 @@ function fallbackAgent3(
     formats: {
       website: testimonial,
       linkedin: testimonial,
-      social: context.transformation || testimonial,
+      social: testimonial,
       caseStudy: testimonial,
     },
     highlightedMetrics: context.metrics.map((m) => ({
