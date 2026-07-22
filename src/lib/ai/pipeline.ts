@@ -27,6 +27,7 @@ interface SessionDoc {
   company_description: string;
   company_target_audience: string;
   company_slug: string;
+  company_user_id: string;
   customerName: string;
   customerEmail: string;
   customerRole?: string;
@@ -56,6 +57,7 @@ export async function createSession(
     company_description: company.description,
     company_target_audience: company.targetAudience,
     company_slug: company.slug,
+    company_user_id: company.userId || "",
     customerName,
     customerEmail,
     messages: [],
@@ -114,7 +116,7 @@ export async function runInterviewRound(sessionId: string) {
     description: sessionDoc.company_description,
     targetAudience: sessionDoc.company_target_audience,
     slug: sessionDoc.company_slug,
-    userId: "",
+    userId: sessionDoc.company_user_id || "",
   };
 
   // Safety: prevent infinite loops
