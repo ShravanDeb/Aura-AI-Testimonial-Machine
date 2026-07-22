@@ -223,9 +223,23 @@ export async function runWritingPipeline(
   context: InterviewContext
 ): Promise<string> {
   try {
-    // Idempotency: if testimonial already exists, return it
+    // Idempotency: if testimonial already exists for this session, return it
     const existingSession = await getSessionById(sessionId);
     if (existingSession?.testimonialId) return existingSession.testimonialId;
+
+    // Also check if a testimonial doc exists for this session (race condition guard)
+    const existingTestimonials = await adminDb
+      .collection("testimonials")
+      .where("sessionId", "==", sessionId)
+      .limit(1)
+      .get();
+    if (!existingTestimonials.empty) {
+      const existingId = existingTestimonials.docs[0].id;
+      await adminDb.collection("interview_sessions").doc(sessionId).update({
+        testimonialId: existingId,
+      });
+      return existingId;
+    }
 
     const customerName = existingSession?.customerName || "";
     const customerRole = existingSession?.customerRole || "";

@@ -36,10 +36,17 @@ export default function TestimonialsPage() {
         }
         const snap = await getDocs(q);
         const items: Testimonial[] = [];
-        snap.forEach((d) => items.push({ id: d.id, ...d.data() } as Testimonial));
+        snap.forEach((d) => {
+          const data = d.data();
+          const raw = data.created_at;
+          let dateStr = "";
+          if (raw?.toDate) dateStr = raw.toDate().toISOString();
+          else if (typeof raw === "string") dateStr = raw;
+          items.push({ id: d.id, ...data, created_at: dateStr } as Testimonial);
+        });
         items.sort((a, b) => {
-          const aTime = typeof a.created_at === "string" ? new Date(a.created_at).getTime() : 0;
-          const bTime = typeof b.created_at === "string" ? new Date(b.created_at).getTime() : 0;
+          const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
           return bTime - aTime;
         });
         setTestimonials(items);
