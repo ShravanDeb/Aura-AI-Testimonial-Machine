@@ -223,10 +223,13 @@ export async function runWritingPipeline(
   context: InterviewContext
 ): Promise<string> {
   try {
-    const sessionDoc = await getSessionById(sessionId);
-    const customerName = sessionDoc?.customerName || "";
-    const customerRole = sessionDoc?.customerRole || "";
-    const customerCompany = sessionDoc?.customerCompany || "";
+    // Idempotency: if testimonial already exists, return it
+    const existingSession = await getSessionById(sessionId);
+    if (existingSession?.testimonialId) return existingSession.testimonialId;
+
+    const customerName = existingSession?.customerName || "";
+    const customerRole = existingSession?.customerRole || "";
+    const customerCompany = existingSession?.customerCompany || "";
 
     let draft: Agent3Response = await callAgent3(
       company,
@@ -283,8 +286,7 @@ export async function runWritingPipeline(
     return docRef.id;
   } catch (err) {
     console.error("Writing pipeline failed:", err);
-    // Don't propagate the error - we've already updated the session status
-    throw new Error("Writing pipeline failed silently");
+    throw err;
   }
 }
 

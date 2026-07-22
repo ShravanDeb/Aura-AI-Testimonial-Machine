@@ -1,5 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
+import { runWritingPipeline } from "@/lib/ai/pipeline";
+import type { Company } from "@/lib/ai/types";
 
 // POST — Create a new interview session
 export async function POST(request: Request) {
@@ -68,7 +70,43 @@ export async function GET(request: Request) {
 
     if (!sessionSnap.empty) {
       const doc = sessionSnap.docs[0];
-      return NextResponse.json({ type: "session", id: doc.id, ...doc.data() });
+      const data = doc.data();
+
+      // Recovery: if session is stuck in "writing" with no testimonial, retry the pipeline
+      if (data.status === "writing" && !data.testimonialId) {
+        after(async () => {
+          try {
+            const companyDoc = await adminDb.collection("campaigns").doc(data.companyId).get();
+            const companyData = companyDoc.data();
+            const company: Company = {
+              id: data.companyId,
+              name: data.company_name || "Unknown",
+              description: data.company_description || "",
+              targetAudience: data.company_target_audience || "customers",
+              slug: data.company_slug || "",
+              userId: companyData?.user_id || data.company_user_id || "",
+            };
+
+            const testimonialId = await runWritingPipeline(
+              doc.id,
+              company,
+              data.messages || [],
+              data.context || {
+                problem: null, impact: null, transformation: null, recommendation: null,
+                detectedEmotion: "neutral", warmthLevel: 5, metrics: [], completeness: 100, readyForAgent3: true,
+              },
+            );
+            await adminDb.collection("interview_sessions").doc(doc.id).update({
+              testimonialId,
+              status: "completed",
+            });
+          } catch (err) {
+            console.error("Session recovery pipeline failed:", err);
+          }
+        });
+      }
+
+      return NextResponse.json({ type: "session", id: doc.id, ...data });
     }
   } catch (err) {
     console.error("Session lookup failed:", err);
