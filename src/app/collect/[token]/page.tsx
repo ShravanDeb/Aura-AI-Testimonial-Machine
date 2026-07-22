@@ -85,7 +85,7 @@ export default function CollectPage() {
             sessionSlug: data.slug,
           }));
         } else if (data.type === "session" && data.status === "writing") {
-          // Writing pipeline is running — show processing
+          // Writing pipeline may have been interrupted — retry it
           setState((s) => ({
             ...s,
             status: "processing",
@@ -93,6 +93,16 @@ export default function CollectPage() {
             sessionSlug: data.slug,
             completeness: 100,
           }));
+          try {
+            await fetch(`/api/sessions/${data.slug}/write`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ sessionId: data.id }),
+            });
+          } catch {
+            // Will show done regardless — recovery is best-effort
+          }
+          setState((s) => ({ ...s, status: "done" }));
         } else if (data.type === "company") {
           // Company found, no session yet — show intro
           setState((s) => ({
@@ -158,6 +168,18 @@ export default function CollectPage() {
 
       if (data.status === "interview_complete") {
         setState((s) => ({ ...s, status: "processing", completeness: 100 }));
+
+        try {
+          await fetch(`/api/sessions/${newSlug}/write`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId: newSessionId }),
+          });
+        } catch {
+          // Recovery via session GET will handle it
+        }
+
+        setState((s) => ({ ...s, status: "done" }));
         return;
       }
 
@@ -238,9 +260,19 @@ export default function CollectPage() {
 
       if (data.status === "interview_complete") {
         setState((s) => ({ ...s, status: "processing", completeness: 100 }));
-        setTimeout(() => {
-          setState((s) => ({ ...s, status: "done" }));
-        }, 3000);
+
+        // Trigger the writing pipeline in its own request (no serverless timeout)
+        try {
+          await fetch(`/api/sessions/${state.sessionSlug}/write`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId: state.sessionId }),
+          });
+        } catch {
+          // Pipeline may still have succeeded — the session GET recovery will catch it
+        }
+
+        setState((s) => ({ ...s, status: "done" }));
         return;
       }
 
