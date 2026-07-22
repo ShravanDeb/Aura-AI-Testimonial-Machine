@@ -2,7 +2,7 @@
 // Model: OpenRouter Gemma 4 26B (free) — strong judgment, instruction following
 // Role: Validate testimonial quality, catch fake/salesy/generic content
 
-import { OPENROUTER_URL, AGENT4_MODEL } from "./config";
+import { GROQ_URL, AGENT4_MODEL } from "./config";
 import type {
   Company,
   Message,
@@ -55,13 +55,11 @@ export async function callAgent4(
   }
 
   try {
-    const res = await fetch(OPENROUTER_URL, {
+    const res = await fetch(GROQ_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-        "X-Title": "Aura AI Testimonial Machine",
       },
       body: JSON.stringify({
         model: AGENT4_MODEL,
@@ -87,7 +85,6 @@ Score it and check all authenticity criteria.`,
         ],
         temperature: 0.3,
         max_tokens: 500,
-        reasoning: { effort: "none" },
       }),
     });
 

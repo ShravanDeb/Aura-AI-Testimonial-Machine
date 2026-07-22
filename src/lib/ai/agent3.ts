@@ -2,7 +2,7 @@
 // Model: OpenRouter Nemotron 3 Super 120B (free) — best creative writing at $0
 // Role: Craft polished testimonial from interview data, generate multi-format output
 
-import { OPENROUTER_URL, AGENT3_MODEL, FALLBACK_OR } from "./config";
+import { GROQ_URL, AGENT3_MODEL, FALLBACK_GROQ } from "./config";
 import type {
   Company,
   Message,
@@ -73,13 +73,11 @@ export async function callAgent3(
   }
 
   try {
-    const res = await fetch(OPENROUTER_URL, {
+    const res = await fetch(GROQ_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-        "X-Title": "Aura AI Testimonial Machine",
       },
       body: JSON.stringify({
         model: AGENT3_MODEL,
@@ -95,7 +93,6 @@ export async function callAgent3(
         ],
         temperature: 0.7,
         max_tokens: 800,
-        reasoning: { effort: "none" },
       }),
     });
 

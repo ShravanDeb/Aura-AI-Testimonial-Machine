@@ -1,5 +1,4 @@
 // ── AI Provider Configuration ─────────────────────────────────────────────────
-// All models are FREE tier — no credit card, no cost
 
 export const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 export const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -10,11 +9,11 @@ export const AGENT1_MODEL = "llama-3.3-70b-versatile";
 // Agent 2 — Options Agent (OpenRouter Nemotron, creative option generation)
 export const AGENT2_MODEL = "nvidia/nemotron-3-super-120b-a12b:free";
 
-// Agent 3 — Testimonial Writer (OpenRouter Nemotron 120B free, creative writing)
-export const AGENT3_MODEL = "nvidia/nemotron-3-super-120b-a12b:free";
+// Agent 3 — Testimonial Writer (Groq Llama 70B — fast, fits Hobby 10s limit)
+export const AGENT3_MODEL = "llama-3.3-70b-versatile";
 
-// Agent 4 — Authenticity Checker (OpenRouter Gemma 4 26B free, judgment)
-export const AGENT4_MODEL = "google/gemma-4-26b-a4b-it:free";
+// Agent 4 — Authenticity Checker (Groq Llama 70B — fast, fits Hobby 10s limit)
+export const AGENT4_MODEL = "llama-3.3-70b-versatile";
 
 // Fallback models
 export const FALLBACK_GROQ = "llama-3.1-8b-instant";

@@ -302,20 +302,18 @@ async function callAgent3WithFeedback(
   customerRole?: string,
   customerCompany?: string
 ): Promise<Agent3Response> {
-  const { OPENROUTER_URL, AGENT3_MODEL } = await import("./config");
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const { GROQ_URL, AGENT3_MODEL } = await import("./config");
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return callAgent3(company, messages, context, customerName, customerRole, customerCompany);
 
   const { formatMessages } = await import("./types");
 
   try {
-    const res = await fetch(OPENROUTER_URL, {
+    const res = await fetch(GROQ_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-        "X-Title": "Aura AI Testimonial Machine",
       },
       body: JSON.stringify({
         model: AGENT3_MODEL,
@@ -356,7 +354,6 @@ Respond with valid JSON matching the Agent 3 schema.`,
         ],
         temperature: 0.7,
         max_tokens: 800,
-        reasoning: { effort: "none" },
       }),
     });
 
