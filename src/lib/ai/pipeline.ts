@@ -227,20 +227,6 @@ export async function runWritingPipeline(
     const existingSession = await getSessionById(sessionId);
     if (existingSession?.testimonialId) return existingSession.testimonialId;
 
-    // Also check if a testimonial doc exists for this session (race condition guard)
-    const existingTestimonials = await adminDb
-      .collection("testimonials")
-      .where("sessionId", "==", sessionId)
-      .limit(1)
-      .get();
-    if (!existingTestimonials.empty) {
-      const existingId = existingTestimonials.docs[0].id;
-      await adminDb.collection("interview_sessions").doc(sessionId).update({
-        testimonialId: existingId,
-      });
-      return existingId;
-    }
-
     const customerName = existingSession?.customerName || "";
     const customerRole = existingSession?.customerRole || "";
     const customerCompany = existingSession?.customerCompany || "";
@@ -294,13 +280,13 @@ export async function runWritingPipeline(
       created_at: FieldValue.serverTimestamp(),
     };
 
-    const docRef = await adminDb.collection("testimonials").add(testimonialData);
+    const docRef = await adminDb.collection("testimonials").doc(sessionId).set(testimonialData);
 
     await adminDb.collection("interview_sessions").doc(sessionId).update({
-      testimonialId: docRef.id,
+      testimonialId: sessionId,
     });
 
-    return docRef.id;
+    return sessionId;
   } catch (err) {
     console.error("Writing pipeline failed:", err);
     throw err;
