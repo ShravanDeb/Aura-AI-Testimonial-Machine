@@ -6,8 +6,8 @@ export const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 // Agent 1 — Interview Agent (Groq Llama 70B, best reasoning)
 export const AGENT1_MODEL = "llama-3.3-70b-versatile";
 
-// Agent 2 — Options Agent (OpenRouter Nemotron, creative option generation)
-export const AGENT2_MODEL = "nvidia/nemotron-3-super-120b-a12b:free";
+// Agent 2 — Options Agent (Groq Llama 70B, fast JSON generation)
+export const AGENT2_MODEL = "llama-3.3-70b-versatile";
 
 // Agent 3 — Testimonial Writer (Groq Llama 70B — fast, fits Hobby 10s limit)
 export const AGENT3_MODEL = "llama-3.3-70b-versatile";
