@@ -77,12 +77,21 @@ export default function CollectPage() {
         const data = await res.json();
 
         if (data.type === "session" && data.status === "active") {
-          // Already has an active session — resume it
+          // Resume the interview
           setState((s) => ({
             ...s,
             status: "interview",
             companyName: data.company_name || "this company",
             sessionSlug: data.slug,
+          }));
+        } else if (data.type === "session" && data.status === "writing") {
+          // Writing pipeline is running — show processing
+          setState((s) => ({
+            ...s,
+            status: "processing",
+            companyName: data.company_name || "this company",
+            sessionSlug: data.slug,
+            completeness: 100,
           }));
         } else if (data.type === "company") {
           // Company found, no session yet — show intro
@@ -91,6 +100,13 @@ export default function CollectPage() {
             status: "intro",
             companyName: data.company_name || "this company",
             companyId: data.companyId,
+          }));
+        } else if (data.type === "session" && data.status === "completed") {
+          // Interview already completed
+          setState((s) => ({
+            ...s,
+            status: "done",
+            companyName: data.company_name || "this company",
           }));
         } else {
           setState((s) => ({ ...s, status: "error", error: "Link is no longer active" }));

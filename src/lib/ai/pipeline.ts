@@ -130,41 +130,21 @@ export async function runInterviewRound(sessionId: string) {
 
   // 3. Check if Agent 1 says we have enough info
   if (agent1.ready && agent1.summary) {
-    // Save summary and mark as writing — don't await the writing pipeline
+    const updatedContext = { ...context, ...agent1.summary, readyForAgent3: true, completeness: 100 };
+
     await adminDb.collection("interview_sessions").doc(sessionId).update({
-      context: {
-        ...context,
-        ...agent1.summary,
-        readyForAgent3: true,
-        completeness: 100,
-      },
+      context: updatedContext,
       status: "writing",
       completed_at: FieldValue.serverTimestamp(),
-    });
-
-    // Run writing pipeline in background — don't block the response
-    runWritingPipeline(
-      sessionId,
-      company,
-      messages,
-      { ...context, ...agent1.summary, completeness: 100, readyForAgent3: true }
-    ).then(async (testimonialId) => {
-      await adminDb.collection("interview_sessions").doc(sessionId).update({
-        testimonialId,
-        status: "completed",
-      });
-    }).catch(async (err) => {
-      console.error("Writing pipeline failed:", err);
-      await adminDb.collection("interview_sessions").doc(sessionId).update({
-        status: "completed",
-        testimonialId: null,
-      });
     });
 
     return {
       status: "interview_complete" as const,
       completeness: 100,
       testimonialId: null,
+      company,
+      messages,
+      context: updatedContext,
     };
   }
 
@@ -401,35 +381,21 @@ async function forceComplete(
   messages: Message[],
   context: InterviewContext
 ) {
+  const updatedContext = { ...context, completeness: 100, readyForAgent3: true };
+
   await adminDb.collection("interview_sessions").doc(sessionDoc.id).update({
-    context: { ...context, readyForAgent3: true, completeness: 100 },
+    context: updatedContext,
     status: "writing",
     completed_at: FieldValue.serverTimestamp(),
-  });
-
-  // Fire and forget — don't block the response
-  runWritingPipeline(
-    sessionDoc.id,
-    company,
-    messages,
-    { ...context, completeness: 100, readyForAgent3: true }
-  ).then(async (testimonialId) => {
-    await adminDb.collection("interview_sessions").doc(sessionDoc.id).update({
-      testimonialId,
-      status: "completed",
-    });
-  }).catch(async (err) => {
-    console.error("Writing pipeline (force) failed:", err);
-    await adminDb.collection("interview_sessions").doc(sessionDoc.id).update({
-      status: "completed",
-      testimonialId: null,
-    });
   });
 
   return {
     status: "interview_complete" as const,
     completeness: 100,
     testimonialId: null,
+    company,
+    messages,
+    context: updatedContext,
   };
 }
 

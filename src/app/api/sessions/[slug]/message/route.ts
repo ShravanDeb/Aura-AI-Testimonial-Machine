@@ -1,5 +1,25 @@
-import { NextResponse } from "next/server";
-import { runInterviewRound, processAnswer, getSessionById, getSessionBySlug } from "@/lib/ai/pipeline";
+import { NextResponse, after } from "next/server";
+import { runInterviewRound, processAnswer, getSessionById, getSessionBySlug, runWritingPipeline } from "@/lib/ai/pipeline";
+import { adminDb } from "@/lib/firebase-admin";
+import type { Company, Message, InterviewContext } from "@/lib/ai/types";
+
+function scheduleWritingPipeline(sessionId: string, company: Company, messages: Message[], context: InterviewContext) {
+  after(async () => {
+    try {
+      const testimonialId = await runWritingPipeline(sessionId, company, messages, context);
+      await adminDb.collection("interview_sessions").doc(sessionId).update({
+        testimonialId,
+        status: "completed",
+      });
+    } catch (err) {
+      console.error("Writing pipeline failed:", err);
+      await adminDb.collection("interview_sessions").doc(sessionId).update({
+        status: "completed",
+        testimonialId: null,
+      });
+    }
+  });
+}
 
 // POST — Process a customer answer and get the next question
 // Accepts either slug (via URL) or sessionId (via body) for session lookup
@@ -33,7 +53,17 @@ export async function POST(
 
     if (action === "start") {
       const result = await runInterviewRound(session.id);
-      return NextResponse.json(result);
+
+      if (result.status === "interview_complete" && result.company && result.messages && result.context) {
+        scheduleWritingPipeline(session.id, result.company, result.messages, result.context);
+      }
+
+      return NextResponse.json({
+        status: result.status,
+        completeness: result.completeness,
+        ...("testimonialId" in result ? { testimonialId: result.testimonialId } : {}),
+        ...(result.status === "question_ready" ? { question: result.question, options: result.options, detectedEmotion: result.detectedEmotion, round: result.round } : {}),
+      });
     }
 
     if (action === "answer") {
@@ -41,7 +71,17 @@ export async function POST(
         return NextResponse.json({ error: "answer is required" }, { status: 400 });
       }
       const result = await processAnswer(session.id, answer, selectedOptionId || null);
-      return NextResponse.json(result);
+
+      if (result.status === "interview_complete" && result.company && result.messages && result.context) {
+        scheduleWritingPipeline(session.id, result.company, result.messages, result.context);
+      }
+
+      return NextResponse.json({
+        status: result.status,
+        completeness: result.completeness,
+        ...("testimonialId" in result ? { testimonialId: result.testimonialId } : {}),
+        ...(result.status === "question_ready" ? { question: result.question, options: result.options, detectedEmotion: result.detectedEmotion, round: result.round } : {}),
+      });
     }
 
     return NextResponse.json(
