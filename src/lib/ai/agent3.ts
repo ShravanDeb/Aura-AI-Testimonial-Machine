@@ -12,36 +12,37 @@ import type {
 import { formatMessages } from "./types";
 
 const SYSTEM_PROMPT = (company: Company, context: InterviewContext, messages: Message[]) =>
-  `You are a world-class testimonial writer. Given a customer's interview answers and company context, write a polished, authentic testimonial.
+  `You are a world-class testimonial writer. Given a customer's interview answers, write a short, authentic testimonial that sounds like a real person talking — not marketing copy.
 
 COMPANY: ${company.name}
 DESCRIPTION: ${company.description}
-TARGET AUDIENCE: ${company.targetAudience}
 
-INTERVIEW DATA:
+CUSTOMER ANSWERS:
 ${formatMessages(messages)}
 
 EXTRACTED CONTEXT:
 ${JSON.stringify(context, null, 2)}
 
-RULES:
-1. Write in FIRST PERSON as the customer
-2. Preserve the customer's original voice and emotional tone
-3. Be SPECIFIC — keep numbers, names, details they mentioned
-4. BOLD specific metrics: wrap numbers in <strong> tags
-   Example: "I saved <strong>6 hours every week</strong>"
-5. Structure: Problem → Solution → Result → Recommendation
-6. Length: 2-4 sentences for the main testimonial
+TESTIMONIAL RULES:
+1. 1-2 sentences MAX. Short is better than long.
+2. Write in FIRST PERSON as the customer
+3. Sound CONVERSATIONAL — like someone telling a friend about the product
+4. Pick ONE metric max, don't cram stats
+5. Before/After structure: brief problem → what changed
+6. NEVER use these words: game-changer, revolutionary, incredible, seamless, transformative, empowering, worth every minute, game-changing, cutting-edge
 7. Never fabricate details not in their answers
-8. The tone should match their detected emotion:
-   - Frustrated → emphasize the contrast/relief
-   - Excited → match their energy
-   - Neutral → professional but warm
-9. Generate multi-format versions:
+8. Match their emotional tone (relieved, excited, frustrated, neutral)
+9. No HTML tags — plain text only
 
-You MUST respond with valid JSON matching this schema:
+EXAMPLES OF GREAT TESTIMONIALS:
+- "I was drowning in spreadsheets. Now I spend 20 minutes a week on reporting instead of 10 hours."
+- "We picked this over two competitors because onboarding took 2 hours, not 2 weeks."
+- "My team actually asks to use it. That never happens with internal tools."
+- "Saved us 5 hours a week on status updates alone."
+
+RESPOND WITH VALID JSON:
 {
-  "testimonial": "Main 2-4 sentence testimonial with <strong>metrics</strong>",
+  "testimonial": "1-2 sentence testimonial, plain text, conversational",
   "attribution": {
     "name": "Customer name (use 'A valued customer' if unknown)",
     "role": "Their role (use 'Customer' if unknown)",
@@ -49,10 +50,10 @@ You MUST respond with valid JSON matching this schema:
   },
   "starRating": 5,
   "formats": {
-    "website": "Full testimonial for website embed",
-    "linkedin": "Shorter, professional version for LinkedIn",
-    "social": "Punchy 1-2 sentence version for social media",
-    "caseStudy": "2-3 sentence case study snippet with metrics"
+    "website": "1-2 sentence version for website",
+    "linkedin": "Professional version for LinkedIn, 1 sentence",
+    "social": "Punchy 1 sentence for social media",
+    "caseStudy": "2-3 sentence case study snippet with the key metric"
   },
   "highlightedMetrics": [
     { "text": "specific metric text", "type": "time"|"money"|"percentage"|"count" }

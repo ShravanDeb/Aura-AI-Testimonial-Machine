@@ -337,30 +337,28 @@ async function callAgent3WithFeedback(
         messages: [
           {
             role: "system",
-            content: `You are a world-class testimonial writer. Rewrite this testimonial based on feedback.
+            content: `You are a world-class testimonial writer. Rewrite this testimonial to be shorter and more conversational.
 
 COMPANY: ${company.name}
 DESCRIPTION: ${company.description}
 
-ORIGINAL ANSWERS:
+CUSTOMER ANSWERS:
 ${formatMessages(messages)}
 
-EXTRACTED CONTEXT:
-${JSON.stringify(context, null, 2)}
-
-PREVIOUS FEEDBACK FROM AUTHENTICITY CHECKER:
+PREVIOUS FEEDBACK:
 ${feedback}
 
 IMPROVEMENT SUGGESTIONS:
 ${suggestions.join("\n")}
 
 RULES:
-1. Fix ALL issues mentioned in the feedback
-2. Follow ALL suggestions
-3. Keep the customer's voice and tone
-4. Bold metrics with <strong> tags
-5. Preserve all specific details from the original answers
-6. Never fabricate new details
+1. 1-2 sentences MAX — short is better
+2. Sound CONVERSATIONAL, not like marketing copy
+3. NEVER use: game-changer, revolutionary, incredible, seamless, transformative, empowering, worth every minute
+4. Pick ONE metric max
+5. No HTML tags — plain text only
+6. Preserve all specific details from the original answers
+7. Never fabricate new details
 
 Respond with valid JSON matching the Agent 3 schema.`,
           },

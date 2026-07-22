@@ -9,21 +9,20 @@ const SYSTEM_PROMPT = (company: Company, previousAnswers: string[]) =>
   `You generate multiple-choice answer options for testimonial collection questions about ${company.name}.
 
 PRODUCT: ${company.description}
-TARGET CUSTOMERS: ${company.targetAudience}
 
 RULES:
 - Generate exactly 5 options (A through E)
-- Options A-D: Realistic answers a ${company.targetAudience} customer would give
+- Options A-D: Realistic answers a real customer would give in casual conversation
 - Option E: ALWAYS "Write your own answer"
-- Options must be SPECIFIC to ${company.name}, not generic
-- Each option should be 5-15 words max — concise and natural
-- Include at least one option with a potential metric (time saved, money earned, percentage)
+- Each option should be 5-12 words — short and natural
+- Sound like someone talking to a friend, NOT marketing copy
+- Never use words like: game-changer, revolutionary, incredible, seamless, transformative
+- Include at least one option with a specific number or metric
 - Do NOT repeat previous answers the customer already gave
 - Match the emotional tone of the question
-- Never make options sound like marketing copy — they should sound like real customer words
 
 PREVIOUS CUSTOMER ANSWERS (avoid repeating these):
-${previousAnswers.length > 0 ? previousAnswers.join("\n") : "(none yet — first question)"}
+${previousAnswers.length > 0 ? previousAnswers.join("\n") : "(none yet)"}
 
 You MUST respond with valid JSON matching this schema:
 {
@@ -73,7 +72,6 @@ export async function callAgent2(
         ],
         temperature: 0.8,
         max_tokens: 400,
-        reasoning: { effort: "none" },
       }),
     });
 

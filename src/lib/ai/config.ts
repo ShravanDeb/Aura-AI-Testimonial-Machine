@@ -19,5 +19,5 @@ export const AGENT4_MODEL = "llama-3.3-70b-versatile";
 export const FALLBACK_GROQ = "llama-3.1-8b-instant";
 export const FALLBACK_OR = "google/gemma-4-31b-it:free";
 
-export const MAX_INTERVIEW_ROUNDS = 8;
+export const MAX_INTERVIEW_ROUNDS = 5;
 export const MAX_REWRITE_ATTEMPTS = 3;

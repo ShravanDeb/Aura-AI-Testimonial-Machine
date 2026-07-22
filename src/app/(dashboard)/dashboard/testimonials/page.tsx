@@ -136,7 +136,7 @@ export default function TestimonialsPage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-lg)" }}>
                 <div>
                   <p style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-micro)", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: "var(--tracking-wide)", marginBottom: "var(--space-xs)" }}>Raw</p>
-                  <p className="raw-text" style={{ fontSize: "var(--text-small)" }}>{t.content}</p>
+                  <p className="raw-text" style={{ fontSize: "var(--text-small)" }}>{t.content?.replace(/<[^>]*>/g, "")}</p>
                 </div>
                 {t.polished_content && (
                   <div>
